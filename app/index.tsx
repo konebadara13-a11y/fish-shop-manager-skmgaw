@@ -7,34 +7,91 @@ import { commonStyles, colors } from '../styles/commonStyles';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useData } from '../contexts/DataContext';
 import Icon from '../components/Icon';
-import SimpleBottomSheet from '../components/BottomSheet';
 import LanguageSelector from '../components/LanguageSelector';
+import SimpleBottomSheet from '../components/BottomSheet';
 
 export default function Dashboard() {
   const { t } = useLanguage();
-  const { getDashboardStats, loading, refreshData } = useData();
+  const { 
+    products, 
+    sales, 
+    customers, 
+    inventoryTransactions, 
+    loading, 
+    getDashboardStats, 
+    refreshData 
+  } = useData();
   const [refreshing, setRefreshing] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
 
   const stats = getDashboardStats();
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refreshData();
-    setRefreshing(false);
+    try {
+      await refreshData();
+    } catch (error) {
+      console.log('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const formatCurrency = (amount: number) => {
     return `$${amount.toFixed(2)}`;
   };
 
-  const navigationItems = [
-    { key: 'products', title: t('products'), icon: 'fish-outline', route: '/products' },
-    { key: 'inventory', title: t('inventory'), icon: 'cube-outline', route: '/inventory' },
-    { key: 'sales', title: t('sales'), icon: 'card-outline', route: '/sales' },
-    { key: 'customers', title: t('customers'), icon: 'people-outline', route: '/customers' },
-    { key: 'reports', title: t('reports'), icon: 'bar-chart-outline', route: '/reports' },
+  const menuItems = [
+    {
+      title: t('products'),
+      icon: 'fish-outline',
+      route: '/products',
+      count: products.length,
+      color: colors.primary,
+    },
+    {
+      title: t('inventory'),
+      icon: 'cube-outline',
+      route: '/inventory',
+      count: stats.lowStockProducts.length + stats.outOfStockProducts.length,
+      color: colors.warning,
+    },
+    {
+      title: t('sales'),
+      icon: 'receipt-outline',
+      route: '/sales',
+      count: sales.filter(sale => {
+        const today = new Date();
+        const saleDate = new Date(sale.date);
+        return saleDate.toDateString() === today.toDateString();
+      }).length,
+      color: colors.success,
+    },
+    {
+      title: t('customers'),
+      icon: 'people-outline',
+      route: '/customers',
+      count: customers.length,
+      color: colors.accent,
+    },
+    {
+      title: t('reports'),
+      icon: 'bar-chart-outline',
+      route: '/reports',
+      count: 0,
+      color: colors.secondary,
+    },
   ];
+
+  if (loading) {
+    return (
+      <SafeAreaView style={commonStyles.container}>
+        <View style={[commonStyles.center, { flex: 1 }]}>
+          <Text style={commonStyles.text}>{t('loading')}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={commonStyles.container}>
@@ -48,18 +105,19 @@ export default function Dashboard() {
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
       }}>
-        <Text style={[commonStyles.title, { fontSize: 20 }]}>
-          🐟 Fish Shop Manager
+        <Text style={[commonStyles.title, { fontSize: 24 }]}>
+          Fish Shop Manager
         </Text>
         <TouchableOpacity
-          onPress={() => setShowSettings(true)}
+          onPress={() => setShowLanguageSelector(true)}
           style={{
-            padding: 8,
-            borderRadius: 8,
             backgroundColor: colors.backgroundAlt,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 8,
           }}
         >
-          <Icon name="settings-outline" size={24} color={colors.text} />
+          <Icon name="language-outline" size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -68,48 +126,62 @@ export default function Dashboard() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        showsVerticalScrollIndicator={false}
       >
-        {/* Stats Cards */}
-        <View style={commonStyles.section}>
-          <Text style={commonStyles.subtitle}>{t('dashboard')}</Text>
+        {/* Debug Info */}
+        <View style={[commonStyles.card, { backgroundColor: colors.backgroundAlt, marginBottom: 16 }]}>
+          <Text style={[commonStyles.subtitle, { marginBottom: 8 }]}>
+            Debug Info
+          </Text>
+          <Text style={commonStyles.textSecondary}>
+            Products: {products.length} | Sales: {sales.length} | Customers: {customers.length}
+          </Text>
+          <Text style={commonStyles.textSecondary}>
+            Transactions: {inventoryTransactions.length}
+          </Text>
+        </View>
+
+        {/* Today's Summary */}
+        <View style={[commonStyles.card, { marginBottom: 16 }]}>
+          <Text style={[commonStyles.subtitle, { marginBottom: 16 }]}>
+            {t('todaysSales')}
+          </Text>
           
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            <View style={[commonStyles.card, { width: '48%', marginBottom: 12 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ alignItems: 'center', flex: 1 }}>
               <Text style={[commonStyles.textSecondary, { fontSize: 12 }]}>
-                {t('todaysSales')}
+                {t('totalRevenue')}
               </Text>
-              <Text style={[commonStyles.title, { fontSize: 18, color: colors.primary }]}>
+              <Text style={[commonStyles.title, { fontSize: 20, color: colors.success }]}>
                 {formatCurrency(stats.todaysSales)}
               </Text>
             </View>
-
-            <View style={[commonStyles.card, { width: '48%', marginBottom: 12 }]}>
+            
+            <View style={{ alignItems: 'center', flex: 1 }}>
+              <Text style={[commonStyles.textSecondary, { fontSize: 12 }]}>
+                Transactions
+              </Text>
+              <Text style={[commonStyles.title, { fontSize: 20 }]}>
+                {sales.filter(sale => {
+                  const today = new Date();
+                  const saleDate = new Date(sale.date);
+                  return saleDate.toDateString() === today.toDateString();
+                }).length}
+              </Text>
+            </View>
+            
+            <View style={{ alignItems: 'center', flex: 1 }}>
               <Text style={[commonStyles.textSecondary, { fontSize: 12 }]}>
                 {t('netProfit')}
               </Text>
-              <Text style={[commonStyles.title, { 
-                fontSize: 18, 
-                color: stats.netProfit >= 0 ? colors.success : colors.error 
-              }]}>
+              <Text style={[
+                commonStyles.title, 
+                { 
+                  fontSize: 20, 
+                  color: stats.netProfit >= 0 ? colors.success : colors.error 
+                }
+              ]}>
                 {formatCurrency(stats.netProfit)}
-              </Text>
-            </View>
-
-            <View style={[commonStyles.card, { width: '48%' }]}>
-              <Text style={[commonStyles.textSecondary, { fontSize: 12 }]}>
-                {t('lowStock')}
-              </Text>
-              <Text style={[commonStyles.title, { fontSize: 18, color: colors.warning }]}>
-                {stats.lowStockProducts.length}
-              </Text>
-            </View>
-
-            <View style={[commonStyles.card, { width: '48%' }]}>
-              <Text style={[commonStyles.textSecondary, { fontSize: 12 }]}>
-                {t('outOfStock')}
-              </Text>
-              <Text style={[commonStyles.title, { fontSize: 18, color: colors.error }]}>
-                {stats.outOfStockProducts.length}
               </Text>
             </View>
           </View>
@@ -117,33 +189,51 @@ export default function Dashboard() {
 
         {/* Stock Alerts */}
         {(stats.lowStockProducts.length > 0 || stats.outOfStockProducts.length > 0) && (
-          <View style={commonStyles.section}>
-            <Text style={commonStyles.subtitle}>{t('stockAlerts')}</Text>
+          <View style={[commonStyles.card, { marginBottom: 16 }]}>
+            <Text style={[commonStyles.subtitle, { marginBottom: 12 }]}>
+              {t('stockAlerts')}
+            </Text>
             
             {stats.outOfStockProducts.map(product => (
-              <View key={product.id} style={[commonStyles.card, { borderLeftWidth: 4, borderLeftColor: colors.error }]}>
-                <View style={commonStyles.row}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={commonStyles.text}>{product.name}</Text>
-                    <Text style={[commonStyles.textSecondary, { color: colors.error }]}>
-                      {t('outOfStock')}
-                    </Text>
-                  </View>
-                  <Icon name="alert-circle-outline" size={24} color={colors.error} />
+              <View key={product.id} style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 8,
+                borderLeftWidth: 4,
+                borderLeftColor: colors.error,
+                paddingLeft: 12,
+                marginBottom: 8,
+                backgroundColor: colors.error + '10',
+                borderRadius: 8,
+              }}>
+                <Icon name="alert-circle-outline" size={20} color={colors.error} />
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={commonStyles.text}>{product.name}</Text>
+                  <Text style={[commonStyles.textSecondary, { color: colors.error }]}>
+                    {t('outOfStock')}
+                  </Text>
                 </View>
               </View>
             ))}
 
             {stats.lowStockProducts.map(product => (
-              <View key={product.id} style={[commonStyles.card, { borderLeftWidth: 4, borderLeftColor: colors.warning }]}>
-                <View style={commonStyles.row}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={commonStyles.text}>{product.name}</Text>
-                    <Text style={[commonStyles.textSecondary, { color: colors.warning }]}>
-                      {t('lowStock')}: {product.stock} left
-                    </Text>
-                  </View>
-                  <Icon name="warning-outline" size={24} color={colors.warning} />
+              <View key={product.id} style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 8,
+                borderLeftWidth: 4,
+                borderLeftColor: colors.warning,
+                paddingLeft: 12,
+                marginBottom: 8,
+                backgroundColor: colors.warning + '10',
+                borderRadius: 8,
+              }}>
+                <Icon name="warning-outline" size={20} color={colors.warning} />
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={commonStyles.text}>{product.name}</Text>
+                  <Text style={[commonStyles.textSecondary, { color: colors.warning }]}>
+                    {t('lowStock')}: {product.stock} left
+                  </Text>
                 </View>
               </View>
             ))}
@@ -152,79 +242,95 @@ export default function Dashboard() {
 
         {/* Top Selling Products */}
         {stats.topSellingProducts.length > 0 && (
-          <View style={commonStyles.section}>
-            <Text style={commonStyles.subtitle}>{t('topSellingProducts')}</Text>
+          <View style={[commonStyles.card, { marginBottom: 16 }]}>
+            <Text style={[commonStyles.subtitle, { marginBottom: 12 }]}>
+              {t('topSellingProducts')}
+            </Text>
             
             {stats.topSellingProducts.map((item, index) => (
-              <View key={item.product.id} style={commonStyles.card}>
-                <View style={commonStyles.row}>
+              <View key={item.product.id} style={[commonStyles.row, { marginBottom: 8 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <View style={{
+                    backgroundColor: colors.primary,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                  }}>
+                    <Text style={{ color: colors.background, fontSize: 12, fontWeight: '600' }}>
+                      {index + 1}
+                    </Text>
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={commonStyles.text}>{item.product.name}</Text>
                     <Text style={commonStyles.textSecondary}>
-                      Sold: {item.quantity} units
+                      {formatCurrency(item.product.price)} each
                     </Text>
                   </View>
-                  <View style={[commonStyles.badge, { backgroundColor: colors.primary }]}>
-                    <Text style={commonStyles.badgeText}>#{index + 1}</Text>
-                  </View>
                 </View>
+                <Text style={[commonStyles.text, { fontWeight: '600', color: colors.primary }]}>
+                  {item.quantity} sold
+                </Text>
               </View>
             ))}
           </View>
         )}
 
-        {/* Quick Actions */}
-        <View style={commonStyles.section}>
-          <Text style={commonStyles.subtitle}>Quick Actions</Text>
-          
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            {navigationItems.map(item => (
-              <TouchableOpacity
-                key={item.key}
-                style={[commonStyles.card, { 
-                  width: '48%', 
-                  marginBottom: 12,
-                  alignItems: 'center',
-                  paddingVertical: 20,
-                }]}
-                onPress={() => router.push(item.route as any)}
-              >
-                <Icon name={item.icon as any} size={32} color={colors.primary} />
-                <Text style={[commonStyles.text, { marginTop: 8, textAlign: 'center' }]}>
-                  {item.title}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* Menu Grid */}
+        <View style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          marginBottom: 32,
+        }}>
+          {menuItems.map(item => (
+            <TouchableOpacity
+              key={item.title}
+              style={[commonStyles.card, {
+                width: '48%',
+                marginBottom: 16,
+                alignItems: 'center',
+                paddingVertical: 24,
+              }]}
+              onPress={() => router.push(item.route)}
+            >
+              <View style={{
+                backgroundColor: item.color + '20',
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}>
+                <Icon name={item.icon as any} size={24} color={item.color} />
+              </View>
+              
+              <Text style={[commonStyles.text, { fontWeight: '600', textAlign: 'center' }]}>
+                {item.title}
+              </Text>
+              
+              {item.count > 0 && (
+                <View style={[commonStyles.badge, { marginTop: 8, backgroundColor: item.color }]}>
+                  <Text style={commonStyles.badgeText}>
+                    {item.count}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
       </ScrollView>
 
-      {/* Settings Bottom Sheet */}
+      {/* Language Selector Bottom Sheet */}
       <SimpleBottomSheet
-        isVisible={showSettings}
-        onClose={() => setShowSettings(false)}
+        isVisible={showLanguageSelector}
+        onClose={() => setShowLanguageSelector(false)}
       >
         <View style={{ padding: 16 }}>
-          <Text style={[commonStyles.title, { marginBottom: 24 }]}>
-            {t('settings')}
-          </Text>
-          
           <LanguageSelector />
-          
-          <TouchableOpacity
-            style={[commonStyles.card, { marginTop: 24 }]}
-            onPress={() => {
-              setShowSettings(false);
-              router.push('/reports');
-            }}
-          >
-            <View style={commonStyles.row}>
-              <Icon name="bar-chart-outline" size={24} color={colors.primary} />
-              <Text style={[commonStyles.text, { marginLeft: 12 }]}>
-                {t('reports')}
-              </Text>
-            </View>
-          </TouchableOpacity>
         </View>
       </SimpleBottomSheet>
     </SafeAreaView>

@@ -13,7 +13,10 @@ const STORAGE_KEYS = {
 // Generic storage functions
 const saveData = async <T>(key: string, data: T[]): Promise<void> => {
   try {
-    await AsyncStorage.setItem(key, JSON.stringify(data));
+    console.log(`Saving ${key}:`, data.length, 'items');
+    const jsonData = JSON.stringify(data);
+    await AsyncStorage.setItem(key, jsonData);
+    console.log(`Successfully saved ${key}`);
   } catch (error) {
     console.log(`Error saving ${key}:`, error);
     throw error;
@@ -22,8 +25,16 @@ const saveData = async <T>(key: string, data: T[]): Promise<void> => {
 
 const loadData = async <T>(key: string): Promise<T[]> => {
   try {
+    console.log(`Loading ${key}...`);
     const data = await AsyncStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
+    if (data) {
+      const parsedData = JSON.parse(data);
+      console.log(`Loaded ${key}:`, parsedData.length, 'items');
+      return parsedData;
+    } else {
+      console.log(`No data found for ${key}, returning empty array`);
+      return [];
+    }
   } catch (error) {
     console.log(`Error loading ${key}:`, error);
     return [];
@@ -100,9 +111,25 @@ export const loadInventoryTransactions = async (): Promise<InventoryTransaction[
 // Clear all data (for testing/reset purposes)
 export const clearAllData = async (): Promise<void> => {
   try {
+    console.log('Clearing all data...');
     await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
+    console.log('All data cleared successfully');
   } catch (error) {
     console.log('Error clearing data:', error);
     throw error;
+  }
+};
+
+// Debug function to check what's stored
+export const debugStorage = async (): Promise<void> => {
+  try {
+    console.log('=== STORAGE DEBUG ===');
+    for (const [name, key] of Object.entries(STORAGE_KEYS)) {
+      const data = await AsyncStorage.getItem(key);
+      console.log(`${name}:`, data ? JSON.parse(data).length : 0, 'items');
+    }
+    console.log('=== END DEBUG ===');
+  } catch (error) {
+    console.log('Error debugging storage:', error);
   }
 };

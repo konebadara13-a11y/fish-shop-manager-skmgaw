@@ -47,6 +47,40 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// Sample data for initial setup
+const sampleProducts: Product[] = [
+  {
+    id: '1',
+    name: 'Fresh Salmon',
+    category: 'freshFish',
+    price: 15.99,
+    stock: 25,
+    description: 'Fresh Atlantic salmon',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: '2',
+    name: 'Frozen Tuna',
+    category: 'frozenFish',
+    price: 12.50,
+    stock: 10,
+    description: 'Premium frozen tuna',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: '3',
+    name: 'Coca Cola',
+    category: 'drinks',
+    price: 2.50,
+    stock: 50,
+    description: 'Cold soft drink',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
+
 interface DataProviderProps {
   children: ReactNode;
 }
@@ -66,6 +100,8 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const loadAllData = async () => {
     try {
       setLoading(true);
+      console.log('Loading all data...');
+      
       const [
         loadedProducts,
         loadedSales,
@@ -80,13 +116,27 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         loadInventoryTransactions()
       ]);
 
-      setProducts(loadedProducts);
+      console.log('Loaded products:', loadedProducts.length);
+      console.log('Loaded sales:', loadedSales.length);
+      console.log('Loaded customers:', loadedCustomers.length);
+
+      // If no products exist, initialize with sample data
+      if (loadedProducts.length === 0) {
+        console.log('No products found, initializing with sample data');
+        await saveProducts(sampleProducts);
+        setProducts(sampleProducts);
+      } else {
+        setProducts(loadedProducts);
+      }
+
       setSales(loadedSales);
       setExpenses(loadedExpenses);
       setCustomers(loadedCustomers);
       setInventoryTransactions(loadedTransactions);
     } catch (error) {
       console.log('Error loading data:', error);
+      // Initialize with sample data if loading fails
+      setProducts(sampleProducts);
     } finally {
       setLoading(false);
     }
@@ -98,116 +148,191 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   // Product functions
   const addProduct = async (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newProduct: Product = {
-      ...productData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    
-    const updatedProducts = [...products, newProduct];
-    setProducts(updatedProducts);
-    await saveProducts(updatedProducts);
+    try {
+      console.log('Adding product:', productData);
+      
+      const newProduct: Product = {
+        ...productData,
+        id: Date.now().toString(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      const updatedProducts = [...products, newProduct];
+      setProducts(updatedProducts);
+      await saveProducts(updatedProducts);
+      
+      console.log('Product added successfully:', newProduct.name);
+    } catch (error) {
+      console.log('Error adding product:', error);
+      throw error;
+    }
   };
 
   const updateProduct = async (id: string, updates: Partial<Product>) => {
-    const updatedProducts = products.map(product =>
-      product.id === id
-        ? { ...product, ...updates, updatedAt: new Date() }
-        : product
-    );
-    setProducts(updatedProducts);
-    await saveProducts(updatedProducts);
+    try {
+      console.log('Updating product:', id, updates);
+      
+      const updatedProducts = products.map(product =>
+        product.id === id
+          ? { ...product, ...updates, updatedAt: new Date() }
+          : product
+      );
+      setProducts(updatedProducts);
+      await saveProducts(updatedProducts);
+      
+      console.log('Product updated successfully');
+    } catch (error) {
+      console.log('Error updating product:', error);
+      throw error;
+    }
   };
 
   const deleteProduct = async (id: string) => {
-    const updatedProducts = products.filter(product => product.id !== id);
-    setProducts(updatedProducts);
-    await saveProducts(updatedProducts);
+    try {
+      console.log('Deleting product:', id);
+      
+      const updatedProducts = products.filter(product => product.id !== id);
+      setProducts(updatedProducts);
+      await saveProducts(updatedProducts);
+      
+      console.log('Product deleted successfully');
+    } catch (error) {
+      console.log('Error deleting product:', error);
+      throw error;
+    }
   };
 
   // Sale functions
   const addSale = async (saleData: Omit<Sale, 'id'>) => {
-    const newSale: Sale = {
-      ...saleData,
-      id: Date.now().toString(),
-    };
-    
-    const updatedSales = [...sales, newSale];
-    setSales(updatedSales);
-    await saveSales(updatedSales);
+    try {
+      console.log('Adding sale:', saleData);
+      
+      const newSale: Sale = {
+        ...saleData,
+        id: Date.now().toString(),
+      };
+      
+      const updatedSales = [...sales, newSale];
+      setSales(updatedSales);
+      await saveSales(updatedSales);
 
-    // Update product stock
-    for (const item of saleData.items) {
-      await updateProduct(item.productId, {
-        stock: products.find(p => p.id === item.productId)!.stock - item.quantity
-      });
-    }
-
-    // Update customer total purchases if customer exists
-    if (saleData.customerId) {
-      const customer = customers.find(c => c.id === saleData.customerId);
-      if (customer) {
-        await updateCustomer(saleData.customerId, {
-          totalPurchases: customer.totalPurchases + saleData.total,
-          lastPurchaseDate: saleData.date,
-        });
+      // Update product stock
+      for (const item of saleData.items) {
+        const product = products.find(p => p.id === item.productId);
+        if (product) {
+          await updateProduct(item.productId, {
+            stock: product.stock - item.quantity
+          });
+        }
       }
+
+      // Update customer total purchases if customer exists
+      if (saleData.customerId) {
+        const customer = customers.find(c => c.id === saleData.customerId);
+        if (customer) {
+          await updateCustomer(saleData.customerId, {
+            totalPurchases: customer.totalPurchases + saleData.total,
+            lastPurchaseDate: saleData.date,
+          });
+        }
+      }
+      
+      console.log('Sale added successfully');
+    } catch (error) {
+      console.log('Error adding sale:', error);
+      throw error;
     }
   };
 
   // Expense functions
   const addExpense = async (expenseData: Omit<Expense, 'id'>) => {
-    const newExpense: Expense = {
-      ...expenseData,
-      id: Date.now().toString(),
-    };
-    
-    const updatedExpenses = [...expenses, newExpense];
-    setExpenses(updatedExpenses);
-    await saveExpenses(updatedExpenses);
+    try {
+      console.log('Adding expense:', expenseData);
+      
+      const newExpense: Expense = {
+        ...expenseData,
+        id: Date.now().toString(),
+      };
+      
+      const updatedExpenses = [...expenses, newExpense];
+      setExpenses(updatedExpenses);
+      await saveExpenses(updatedExpenses);
+      
+      console.log('Expense added successfully');
+    } catch (error) {
+      console.log('Error adding expense:', error);
+      throw error;
+    }
   };
 
   // Customer functions
   const addCustomer = async (customerData: Omit<Customer, 'id' | 'totalPurchases' | 'createdAt'>) => {
-    const newCustomer: Customer = {
-      ...customerData,
-      id: Date.now().toString(),
-      totalPurchases: 0,
-      createdAt: new Date(),
-    };
-    
-    const updatedCustomers = [...customers, newCustomer];
-    setCustomers(updatedCustomers);
-    await saveCustomers(updatedCustomers);
+    try {
+      console.log('Adding customer:', customerData);
+      
+      const newCustomer: Customer = {
+        ...customerData,
+        id: Date.now().toString(),
+        totalPurchases: 0,
+        createdAt: new Date(),
+      };
+      
+      const updatedCustomers = [...customers, newCustomer];
+      setCustomers(updatedCustomers);
+      await saveCustomers(updatedCustomers);
+      
+      console.log('Customer added successfully:', newCustomer.name);
+    } catch (error) {
+      console.log('Error adding customer:', error);
+      throw error;
+    }
   };
 
   const updateCustomer = async (id: string, updates: Partial<Customer>) => {
-    const updatedCustomers = customers.map(customer =>
-      customer.id === id ? { ...customer, ...updates } : customer
-    );
-    setCustomers(updatedCustomers);
-    await saveCustomers(updatedCustomers);
+    try {
+      console.log('Updating customer:', id, updates);
+      
+      const updatedCustomers = customers.map(customer =>
+        customer.id === id ? { ...customer, ...updates } : customer
+      );
+      setCustomers(updatedCustomers);
+      await saveCustomers(updatedCustomers);
+      
+      console.log('Customer updated successfully');
+    } catch (error) {
+      console.log('Error updating customer:', error);
+      throw error;
+    }
   };
 
   // Inventory functions
   const addInventoryTransaction = async (transactionData: Omit<InventoryTransaction, 'id'>) => {
-    const newTransaction: InventoryTransaction = {
-      ...transactionData,
-      id: Date.now().toString(),
-    };
-    
-    const updatedTransactions = [...inventoryTransactions, newTransaction];
-    setInventoryTransactions(updatedTransactions);
-    await saveInventoryTransactions(updatedTransactions);
+    try {
+      console.log('Adding inventory transaction:', transactionData);
+      
+      const newTransaction: InventoryTransaction = {
+        ...transactionData,
+        id: Date.now().toString(),
+      };
+      
+      const updatedTransactions = [...inventoryTransactions, newTransaction];
+      setInventoryTransactions(updatedTransactions);
+      await saveInventoryTransactions(updatedTransactions);
 
-    // Update product stock
-    const product = products.find(p => p.id === transactionData.productId);
-    if (product) {
-      const stockChange = transactionData.type === 'in' ? transactionData.quantity : -transactionData.quantity;
-      await updateProduct(transactionData.productId, {
-        stock: product.stock + stockChange
-      });
+      // Update product stock
+      const product = products.find(p => p.id === transactionData.productId);
+      if (product) {
+        const stockChange = transactionData.type === 'in' ? transactionData.quantity : -transactionData.quantity;
+        await updateProduct(transactionData.productId, {
+          stock: product.stock + stockChange
+        });
+      }
+      
+      console.log('Inventory transaction added successfully');
+    } catch (error) {
+      console.log('Error adding inventory transaction:', error);
+      throw error;
     }
   };
 

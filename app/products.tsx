@@ -28,6 +28,8 @@ export default function ProductsScreen() {
     description: '',
   });
 
+  console.log('ProductsScreen rendered with', products.length, 'products');
+
   const categories: { key: ProductCategory | 'all'; label: string }[] = [
     { key: 'all', label: 'All Categories' },
     { key: 'freshFish', label: t('freshFish') },
@@ -44,6 +46,7 @@ export default function ProductsScreen() {
   });
 
   const resetForm = () => {
+    console.log('Resetting form');
     setFormData({
       name: '',
       category: 'freshFish',
@@ -55,11 +58,13 @@ export default function ProductsScreen() {
   };
 
   const handleAddProduct = () => {
+    console.log('Add product button pressed');
     resetForm();
     setShowAddProduct(true);
   };
 
   const handleEditProduct = (product: Product) => {
+    console.log('Edit product:', product.name);
     setFormData({
       name: product.name,
       category: product.category,
@@ -72,8 +77,23 @@ export default function ProductsScreen() {
   };
 
   const handleSaveProduct = async () => {
-    if (!formData.name.trim() || !formData.price || !formData.stock) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    console.log('Save product called with data:', formData);
+    
+    if (!formData.name.trim()) {
+      console.log('Validation failed: name is empty');
+      Alert.alert('Error', 'Please enter product name');
+      return;
+    }
+    
+    if (!formData.price || isNaN(parseFloat(formData.price))) {
+      console.log('Validation failed: invalid price');
+      Alert.alert('Error', 'Please enter a valid price');
+      return;
+    }
+    
+    if (!formData.stock || isNaN(parseInt(formData.stock))) {
+      console.log('Validation failed: invalid stock');
+      Alert.alert('Error', 'Please enter a valid stock quantity');
       return;
     }
 
@@ -86,17 +106,23 @@ export default function ProductsScreen() {
         description: formData.description.trim(),
       };
 
+      console.log('Processed product data:', productData);
+
       if (editingProduct) {
+        console.log('Updating existing product:', editingProduct.id);
         await updateProduct(editingProduct.id, productData);
       } else {
+        console.log('Adding new product');
         await addProduct(productData);
       }
 
+      console.log('Product saved successfully');
       setShowAddProduct(false);
       resetForm();
+      Alert.alert('Success', 'Product saved successfully');
     } catch (error) {
-      Alert.alert('Error', 'Failed to save product');
       console.log('Error saving product:', error);
+      Alert.alert('Error', 'Failed to save product. Please try again.');
     }
   };
 
@@ -111,10 +137,12 @@ export default function ProductsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('Deleting product:', product.id);
               await deleteProduct(product.id);
+              console.log('Product deleted successfully');
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete product');
               console.log('Error deleting product:', error);
+              Alert.alert('Error', 'Failed to delete product');
             }
           },
         },
@@ -148,7 +176,7 @@ export default function ProductsScreen() {
             <Icon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={[commonStyles.title, { fontSize: 20 }]}>
-            {t('products')}
+            {t('products')} ({products.length})
           </Text>
         </View>
         <TouchableOpacity
@@ -207,8 +235,24 @@ export default function ProductsScreen() {
             <View style={[commonStyles.center, { paddingVertical: 40 }]}>
               <Icon name="fish-outline" size={48} color={colors.textSecondary} />
               <Text style={[commonStyles.textSecondary, { marginTop: 16, textAlign: 'center' }]}>
-                No products found
+                {products.length === 0 ? 'No products added yet' : 'No products found'}
               </Text>
+              {products.length === 0 && (
+                <TouchableOpacity
+                  onPress={handleAddProduct}
+                  style={{
+                    backgroundColor: colors.primary,
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    marginTop: 16,
+                  }}
+                >
+                  <Text style={{ color: colors.background, fontWeight: '600' }}>
+                    Add Your First Product
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             filteredProducts.map(product => (
@@ -257,11 +301,12 @@ export default function ProductsScreen() {
       <SimpleBottomSheet
         isVisible={showAddProduct}
         onClose={() => {
+          console.log('Bottom sheet closed');
           setShowAddProduct(false);
           resetForm();
         }}
       >
-        <View style={{ padding: 16 }}>
+        <ScrollView style={{ padding: 16 }}>
           <Text style={[commonStyles.title, { marginBottom: 24 }]}>
             {editingProduct ? t('editProduct') : t('addProduct')}
           </Text>
@@ -270,7 +315,10 @@ export default function ProductsScreen() {
             style={[commonStyles.input, { marginBottom: 16 }]}
             placeholder={t('productName')}
             value={formData.name}
-            onChangeText={(text) => setFormData({ ...formData, name: text })}
+            onChangeText={(text) => {
+              console.log('Name changed:', text);
+              setFormData({ ...formData, name: text });
+            }}
           />
 
           <View style={{ marginBottom: 16 }}>
@@ -288,7 +336,10 @@ export default function ProductsScreen() {
                     borderRadius: 20,
                     backgroundColor: formData.category === category.key ? colors.primary : colors.backgroundAlt,
                   }}
-                  onPress={() => setFormData({ ...formData, category: category.key as ProductCategory })}
+                  onPress={() => {
+                    console.log('Category changed:', category.key);
+                    setFormData({ ...formData, category: category.key as ProductCategory });
+                  }}
                 >
                   <Text style={{
                     color: formData.category === category.key ? colors.background : colors.text,
@@ -307,14 +358,20 @@ export default function ProductsScreen() {
               style={[commonStyles.input, { flex: 1, marginRight: 8 }]}
               placeholder={t('price')}
               value={formData.price}
-              onChangeText={(text) => setFormData({ ...formData, price: text })}
+              onChangeText={(text) => {
+                console.log('Price changed:', text);
+                setFormData({ ...formData, price: text });
+              }}
               keyboardType="numeric"
             />
             <TextInput
               style={[commonStyles.input, { flex: 1, marginLeft: 8 }]}
               placeholder={t('stock')}
               value={formData.stock}
-              onChangeText={(text) => setFormData({ ...formData, stock: text })}
+              onChangeText={(text) => {
+                console.log('Stock changed:', text);
+                setFormData({ ...formData, stock: text });
+              }}
               keyboardType="numeric"
             />
           </View>
@@ -323,7 +380,10 @@ export default function ProductsScreen() {
             style={[commonStyles.input, { marginBottom: 24, height: 80 }]}
             placeholder={t('description')}
             value={formData.description}
-            onChangeText={(text) => setFormData({ ...formData, description: text })}
+            onChangeText={(text) => {
+              console.log('Description changed:', text);
+              setFormData({ ...formData, description: text });
+            }}
             multiline
             textAlignVertical="top"
           />
@@ -332,6 +392,7 @@ export default function ProductsScreen() {
             <Button
               text={t('cancel')}
               onPress={() => {
+                console.log('Cancel button pressed');
                 setShowAddProduct(false);
                 resetForm();
               }}
@@ -340,11 +401,14 @@ export default function ProductsScreen() {
             />
             <Button
               text={t('save')}
-              onPress={handleSaveProduct}
+              onPress={() => {
+                console.log('Save button pressed');
+                handleSaveProduct();
+              }}
               style={[{ flex: 1, marginLeft: 8 }]}
             />
           </View>
-        </View>
+        </ScrollView>
       </SimpleBottomSheet>
     </SafeAreaView>
   );
